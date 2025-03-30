@@ -3,8 +3,18 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import optuna
+import numpy as np
+import random
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
+
+def set_seed(seed=42):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 class NeuralNetwork(nn.Module):
     def __init__(self, input_size, num_classes, list_hidden, activation='relu'):
@@ -54,6 +64,7 @@ class NeuralNetwork(nn.Module):
             return F.softmax(outputs, dim=1)
 
 def train_neural_network(X_train, y_train, input_size, list_hidden, num_classes, activation='relu', epochs=100, learning_rate=0.01, verbose=True):
+    set_seed()
     model = NeuralNetwork(input_size, num_classes, list_hidden, activation)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
@@ -97,6 +108,7 @@ def preprocess_data(df, target_column):
     return X_scaled, y
 
 def objective(trial, X_train, y_train, input_size, num_classes):
+    set_seed()
     list_hidden = [trial.suggest_int(f'hidden_{i}', 16, 128) for i in range(trial.suggest_int('num_layers', 1, 3))]
     learning_rate = trial.suggest_float('learning_rate', 1e-4, 1e-1)
     activation = trial.suggest_categorical('activation', ['relu', 'tanh', 'sigmoid'])
@@ -113,6 +125,7 @@ def objective(trial, X_train, y_train, input_size, num_classes):
     return accuracy_score(y_train, y_pred)
 
 def tune_hyperparameters(X_train, y_train, input_size, num_classes, n_trials=20):
+    set_seed()
     study = optuna.create_study(direction='maximize')
     study.optimize(lambda trial: objective(trial, X_train, y_train, input_size, num_classes), n_trials=n_trials)
     return study.best_params
